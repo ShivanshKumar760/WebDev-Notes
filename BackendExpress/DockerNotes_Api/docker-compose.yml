@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mini-replit-app
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      WEBSOCKET_PORT: 3001
+      DATABASE_TYPE: mongodb
+      MONGODB_URL: mongodb://mongo:27017/mini-replit
+      JWT_SECRET: your-super-secret-key-change-in-production-12345
+      JWT_EXPIRY: 7d
+      DOCKER_SOCKET: /var/run/docker.sock
+      BASE_IMAGE: node:18-alpine
+      STORAGE_PATH: ./storage/projects
+      MAX_CODE_SIZE: 10485760
+      CODE_TIMEOUT: 30000
+      MAX_MEMORY: 512m
+      MAX_CPU_SHARES: 1024
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./storage/projects:/app/storage/projects
+      - ./logs:/app/logs
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  mongo:
+    image: mongo:5
+    container_name: mini-replit-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+      MONGO_INITDB_DB: mini-replit
+    volumes:
+      - mongo-data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Uncomment for PostgreSQL alternative
+  # postgres:
+  #   image: postgres:14-alpine
+  #   container_name: mini-replit-postgres
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: password123
+  #     POSTGRES_DB: mini-replit
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  mongo-data:
+    driver: local
+  # postgres-data:
+  #   driver: local
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
