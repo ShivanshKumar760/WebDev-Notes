@@ -11,7 +11,6 @@ const projectRoutes = require('./routes/projects');
 const codeRoutes = require('./routes/code');
 
 // Import middleware
-const authMiddleware = require('./middleware/auth');
 const errorHandler = require('./middleware/errorHandler');
 
 // Import services
